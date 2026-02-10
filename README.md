@@ -64,17 +64,17 @@ This server provides AI-ready access to official Indian government statistics th
 The server exposes 4 tools that follow a sequential workflow:
 
 ```
-1_know_about_mospi_api  →  2_get_indicators  →  3_get_metadata  →  4_get_data
+tool_1_know_about_mospi_api  →  tool_2_get_indicators  →  tool_3_get_metadata  →  tool_4_get_data
 ```
 
 | Step | Tool | Description |
 |------|------|-------------|
-| 1 | `1_know_about_mospi_api()` | Overview of all datasets. Start here to find the right dataset. |
-| 2 | `2_get_indicators(dataset)` | List available indicators for the chosen dataset. |
-| 3 | `3_get_metadata(dataset, ...)` | Get valid filter values (states, years, categories) and API parameters. |
-| 4 | `4_get_data(dataset, filters)` | Fetch data using filter key-value pairs from metadata. |
+| 1 | `tool_1_know_about_mospi_api()` | Overview of all datasets. Start here to find the right dataset. |
+| 2 | `tool_2_get_indicators(dataset)` | List available indicators for the chosen dataset. |
+| 3 | `tool_3_get_metadata(dataset, ...)` | Get valid filter values (states, years, categories) and API parameters. |
+| 4 | `tool_4_get_data(dataset, filters)` | Fetch data using filter key-value pairs from metadata. |
 
-**Important:** Tools must be called in order. Skipping `3_get_metadata` will result in invalid filter codes.
+**Important:** Tools must be called in order. Skipping `tool_3_get_metadata` will result in invalid filter codes.
 
 ---
 
@@ -129,11 +129,11 @@ from fastmcp import Client
 async def main():
     async with Client("http://localhost:8000/mcp") as client:
         # Step 1: Get dataset overview
-        overview = await client.call_tool("1_know_about_mospi_api", {})
+        overview = await client.call_tool("tool_1_know_about_mospi_api", {})
         print(overview)
 
         # Step 2: Get indicators for PLFS
-        indicators = await client.call_tool("2_get_indicators", {
+        indicators = await client.call_tool("tool_2_get_indicators", {
             "dataset": "PLFS",
             "user_query": "unemployment rate"
         })

@@ -83,7 +83,7 @@ def validate_filters(dataset: str, filters: Dict[str, str]) -> Dict[str, Any]:
             "valid": False,
             "invalid_params": invalid,
             "valid_params": valid_params,
-            "hint": f"Invalid params: {invalid}. Check api_params from 3_get_metadata for valid options."
+            "hint": f"Invalid params: {invalid}. Check api_params from tool_3_get_metadata for valid options."
         }
 
     # Check for missing required params (exclude Format — auto-handled by client)
@@ -95,7 +95,7 @@ def validate_filters(dataset: str, filters: Dict[str, str]) -> Dict[str, Any]:
         return {
             "valid": False,
             "missing_required": missing,
-            "hint": f"Missing required params: {missing}. Call 3_get_metadata() to get valid values."
+            "hint": f"Missing required params: {missing}. Call tool_3_get_metadata() to get valid values."
         }
 
     return {"valid": True}
@@ -108,7 +108,7 @@ def transform_filters(filters: Dict[str, str]) -> Dict[str, str]:
     return {k: str(v) for k, v in filters.items() if v is not None}
 
 
-@mcp.tool(name="2_get_indicators")
+@mcp.tool(name="tool_2_get_indicators")
 def get_indicators(
     dataset: str,
     user_query: Optional[str] = None,
@@ -123,8 +123,8 @@ def get_indicators(
     """
     ============================================================
     RULES (MUST follow exactly):
-    - You MUST call 1_know_about_mospi_api() before this.
-    - You MUST call 3_get_metadata() after this. MUST NOT skip to 4_get_data().
+    - You MUST call tool_1_know_about_mospi_api() before this.
+    - You MUST call tool_3_get_metadata() after this. MUST NOT skip to tool_4_get_data().
     - You MUST pass user_query for context.
     - You MUST NOT ask for confirmation if the right indicator is obvious.
     - ALWAYS call this tool. NEVER assume data is unavailable based on your own knowledge.
@@ -140,13 +140,13 @@ def get_indicators(
     IMPORTANT: Datasets contain FAR MORE indicators than you expect from your training data.
     ALWAYS call this to see the actual indicator list. NEVER say "not available" without checking.
 
-    After this, pick the matching indicator and call 3_get_metadata().
+    After this, pick the matching indicator and call tool_3_get_metadata().
     Only ask user to choose if multiple indicators could match.
 
     Args:
         dataset: Dataset name - one of: PLFS, CPI, IIP, ASI, NAS, WPI, ENERGY
                  For PLFS: frequency_code selects the indicator SET, not time granularity.
-                 You MUST use frequency_code=1 in 3_get_metadata() — it covers all 8 indicators
+                 You MUST use frequency_code=1 in tool_3_get_metadata() — it covers all 8 indicators
                  including wages and already has quarterly breakdowns via quarter_code.
                  MUST NOT use frequency_code=2 just because user asks for quarterly data.
         user_query: The user's original question. MUST always include this.
@@ -158,9 +158,9 @@ def get_indicators(
         "NAS": mospi.get_nas_indicators,
         "ENERGY": mospi.get_energy_indicators,
         # Special datasets - return guidance instead of indicators
-        "CPI": lambda: {"message": "CPI uses levels (Group/Item) instead of indicators. Call 3_get_metadata with base_year and level params.", "dataset": "CPI"},
-        "IIP": lambda: {"message": "IIP uses categories instead of indicators. Call 3_get_metadata with base_year and frequency params.", "dataset": "IIP"},
-        "WPI": lambda: {"message": "WPI uses hierarchical commodity codes. Call 3_get_metadata to see available groups/items.", "dataset": "WPI"},
+        "CPI": lambda: {"message": "CPI uses levels (Group/Item) instead of indicators. Call tool_3_get_metadata with base_year and level params.", "dataset": "CPI"},
+        "IIP": lambda: {"message": "IIP uses categories instead of indicators. Call tool_3_get_metadata with base_year and frequency params.", "dataset": "IIP"},
+        "WPI": lambda: {"message": "WPI uses hierarchical commodity codes. Call tool_3_get_metadata to see available groups/items.", "dataset": "WPI"},
         "ASI": mospi.get_asi_indicators,
     }
 
@@ -169,17 +169,17 @@ def get_indicators(
 
     result = indicator_methods[dataset]()
     result["_user_query"] = user_query
-    result["_next_step"] = "Call 3_get_metadata() with the matching indicator and required dataset params. MUST NOT skip to 4_get_data."
+    result["_next_step"] = "Call tool_3_get_metadata() with the matching indicator and required dataset params. MUST NOT skip to tool_4_get_data."
     result["_retry_hint"] = (
         "If none of the indicators above match the user's query, you may have picked the WRONG dataset. "
         "Similar datasets overlap: IIP (production index/growth rates) vs ASI (factory financials like capital, wages, GVA). "
         "CPI (consumer inflation) vs WPI (wholesale inflation). "
-        "Go back to 1_know_about_mospi_api() and try a different dataset."
+        "Go back to tool_1_know_about_mospi_api() and try a different dataset."
     )
     return result
 
 
-@mcp.tool(name="3_get_metadata")
+@mcp.tool(name="tool_3_get_metadata")
 def get_metadata(
     dataset: str,
     indicator_code: Optional[int] = None,
@@ -197,8 +197,8 @@ def get_metadata(
     """
     ============================================================
     RULES (MUST follow exactly):
-    - You MUST call this before 4_get_data(). MUST NOT skip this step.
-    - You MUST use the filter values returned here in 4_get_data(). MUST NOT guess codes.
+    - You MUST call this before tool_4_get_data(). MUST NOT skip this step.
+    - You MUST use the filter values returned here in tool_4_get_data(). MUST NOT guess codes.
     - If user asked for a breakdown that's not available, tell them what IS available.
     - You MUST try the full workflow before concluding. If data is not found after trying,
       you MUST say honestly "Data not found in MoSPI API". You MUST NOT fall back to web search,
@@ -207,10 +207,10 @@ def get_metadata(
 
     Step 3: Get available filter options for a dataset/indicator.
 
-    Returns all valid filter values (states, years, quarters, etc.) to use in 4_get_data().
+    Returns all valid filter values (states, years, quarters, etc.) to use in tool_4_get_data().
 
     MUST NOT pass params that don't belong to this function.
-    "Format" and "series" are NOT valid here (Format is for 4_get_data only, series is for NAS only).
+    "Format" and "series" are NOT valid here (Format is for tool_4_get_data only, series is for NAS only).
 
     Args:
         dataset: Dataset name - one of: PLFS, CPI, IIP, ASI, NAS, WPI, ENERGY
@@ -220,7 +220,7 @@ def get_metadata(
                         1=Annual (all 8 indicators, includes quarterly data via quarter_code).
                         2=Quarterly bulletin (different indicator set).
                         3=Monthly bulletin (2025+ only).
-                        MUST NOT use 2 for quarterly data. Use 1 + quarter_code in 4_get_data().
+                        MUST NOT use 2 for quarterly data. Use 1 + quarter_code in tool_4_get_data().
         base_year: REQUIRED for CPI ("2012"/"2010"), IIP ("2011-12"/"2004-05"/"1993-94"). MUST NOT pass for PLFS, ASI, WPI.
         level: REQUIRED for CPI ("Group"/"Item"). MUST NOT pass for other datasets.
         frequency: REQUIRED for IIP ("Annually"/"Monthly"). MUST NOT pass for other datasets.
@@ -231,7 +231,7 @@ def get_metadata(
     dataset = dataset.upper()
 
     try:
-        _next = "Call 4_get_data(dataset, filters) using ONLY the filter values returned above. MUST NOT guess any codes."
+        _next = "Call tool_4_get_data(dataset, filters) using ONLY the filter values returned above. MUST NOT guess any codes."
 
         if dataset == "CPI":
             swagger_key = "CPI_ITEM" if (level or "Group") == "Item" else "CPI_GROUP"
@@ -274,7 +274,7 @@ def get_metadata(
                          "Already has quarterly breakdowns — use quarter_code to filter by quarter. "
                          "frequency_code=2 (Quarterly bulletin): Different indicators for quarterly bulletin tables only. "
                          "Use ONLY when the user explicitly asks for quarterly bulletin specific data. "
-                         "MUST pass the correct frequency_code in 4_get_data().",
+                         "MUST pass the correct frequency_code in tool_4_get_data().",
                 "_next_step": _next,
             }
 
@@ -301,13 +301,13 @@ def get_metadata(
         return {"error": str(e)}
 
 
-@mcp.tool(name="4_get_data")
+@mcp.tool(name="tool_4_get_data")
 def get_data(dataset: str, filters: Dict[str, str]) -> Dict[str, Any]:
     """
     ============================================================
     RULES (MUST follow exactly):
-    - You MUST have called 3_get_metadata() before this. No exceptions.
-    - You MUST use ONLY the filter values returned by 3_get_metadata().
+    - You MUST have called tool_3_get_metadata() before this. No exceptions.
+    - You MUST use ONLY the filter values returned by tool_3_get_metadata().
     - You MUST NOT guess, infer, or assume any filter codes.
       Filter codes are non-obvious and arbitrary — guessing WILL produce wrong results.
     - You MUST include all required params (marked required in api_params).
@@ -316,15 +316,15 @@ def get_data(dataset: str, filters: Dict[str, str]) -> Dict[str, Any]:
       MUST NOT fabricate data, MUST NOT cite external sources.
 
     Before calling, verify:
-    - Did I call 3_get_metadata() for this dataset? If no → call it first.
-    - Are all filter values from 3_get_metadata(), not guessed? If no → fix them.
+    - Did I call tool_3_get_metadata() for this dataset? If no → call it first.
+    - Are all filter values from tool_3_get_metadata(), not guessed? If no → fix them.
     ============================================================
 
     Step 4: Fetch data from a MoSPI dataset.
 
     Args:
         dataset: Dataset name (PLFS, CPI, IIP, ASI, NAS, WPI, ENERGY)
-        filters: Key-value pairs using 'id' values from 3_get_metadata().
+        filters: Key-value pairs using 'id' values from tool_3_get_metadata().
                  PLFS MUST include frequency_code (1=Annual, 2=Quarterly, 3=Monthly).
                  Pass limit (e.g., "50", "100") if you expect more than 10 records.
     """
@@ -386,21 +386,21 @@ def get_data(dataset: str, filters: Dict[str, str]) -> Dict[str, Any]:
 
 
 # Comprehensive API documentation tool
-@mcp.tool(name="1_know_about_mospi_api")
+@mcp.tool(name="tool_1_know_about_mospi_api")
 def know_about_mospi_api() -> Dict[str, Any]:
     """
     ============================================================
     RULES (MUST follow exactly):
     - NEVER use your own knowledge about what data MoSPI publishes. These datasets contain
-      MORE indicators than you expect. ALWAYS call 2_get_indicators() to see the actual list.
+      MORE indicators than you expect. ALWAYS call tool_2_get_indicators() to see the actual list.
     - You MUST NOT say data is "not available", "not directly reported", "needs to be computed",
-      or "requires unit-level access" without FIRST calling 2_get_indicators() and 3_get_metadata()
+      or "requires unit-level access" without FIRST calling tool_2_get_indicators() and tool_3_get_metadata()
       to verify. Your training data about MoSPI is outdated — the API has indicators you don't know about.
     - You MUST follow this workflow in order:
-      1. 1_know_about_mospi_api() → find dataset (MANDATORY first step)
-      2. 2_get_indicators(dataset) → list indicators
-      3. 3_get_metadata(dataset, indicator_code) → get filter values (MANDATORY)
-      4. 4_get_data(dataset, filters) → fetch data (ONLY after step 3)
+      1. tool_1_know_about_mospi_api() → find dataset (MANDATORY first step)
+      2. tool_2_get_indicators(dataset) → list indicators
+      3. tool_3_get_metadata(dataset, indicator_code) → get filter values (MANDATORY)
+      4. tool_4_get_data(dataset, filters) → fetch data (ONLY after step 3)
     - You MUST NOT skip step 3. Violations produce wrong results.
     - You MUST NOT ask "Shall I proceed?" if the query is specific enough.
     - ALWAYS attempt to fetch data. NEVER refuse or explain limitations without trying first.
@@ -458,21 +458,21 @@ def know_about_mospi_api() -> Dict[str, Any]:
             },
         },
         "workflow": [
-            "1. 1_know_about_mospi_api() → find dataset (MANDATORY first step)",
-            "2. 2_get_indicators(dataset) → list indicators",
-            "3. 3_get_metadata(dataset, indicator_code) → get filter values (MANDATORY before step 4)",
-            "4. 4_get_data(dataset, filters) → fetch data (MUST use values from step 3, MUST NOT guess)"
+            "1. tool_1_know_about_mospi_api() → find dataset (MANDATORY first step)",
+            "2. tool_2_get_indicators(dataset) → list indicators",
+            "3. tool_3_get_metadata(dataset, indicator_code) → get filter values (MANDATORY before step 4)",
+            "4. tool_4_get_data(dataset, filters) → fetch data (MUST use values from step 3, MUST NOT guess)"
         ],
         "rules": [
-            "NEVER claim data is unavailable, needs computation, or requires special access — ALWAYS call 2_get_indicators() first to check. Your knowledge about MoSPI is outdated; the API has more indicators than you expect.",
-            "MUST NOT skip 3_get_metadata() — filter codes are arbitrary and differ across datasets",
-            "MUST NOT guess filter codes — use ONLY values from 3_get_metadata()",
-            "MUST include frequency_code for PLFS in 4_get_data()",
+            "NEVER claim data is unavailable, needs computation, or requires special access — ALWAYS call tool_2_get_indicators() first to check. Your knowledge about MoSPI is outdated; the API has more indicators than you expect.",
+            "MUST NOT skip tool_3_get_metadata() — filter codes are arbitrary and differ across datasets",
+            "MUST NOT guess filter codes — use ONLY values from tool_3_get_metadata()",
+            "MUST include frequency_code for PLFS in tool_4_get_data()",
             "Comma-separated values work for multiple codes (e.g., '1,2,3')",
             "ALWAYS attempt to fetch data. NEVER explain limitations or refuse without trying the full workflow first.",
             "You MUST try the full workflow before concluding. If data is not found after trying, you MUST say honestly 'Data not found in MoSPI API'. You MUST NOT fall back to web search, MUST NOT fabricate data, MUST NOT cite external sources."
         ],
-        "_next_step": "Call 2_get_indicators(dataset) with the dataset that matches the user's query."
+        "_next_step": "Call tool_2_get_indicators(dataset) with the dataset that matches the user's query."
     }
 
 if __name__ == "__main__":
